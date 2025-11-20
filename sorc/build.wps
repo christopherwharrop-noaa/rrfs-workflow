@@ -16,13 +16,17 @@ if [[ "${MACHINE}" == "wcoss2" ]]; then
   if [[ -f "${BUILD_VERSION_FILE}" ]]; then
     source "${BUILD_VERSION_FILE}"
   fi
+  set +x
+  module purge                      
+  module use "${HOMErrfs}/modulefiles"
+  module load "rrfs/${MACHINE}.intel"
+  module list
+  set -x
 fi
 
 set +x
-module purge                      
-module use "${HOMErrfs}/modulefiles"
-module load "rrfs/${MACHINE}.${COMPILER}"
-module load netcdf
+RRFS_CONFIG_FILE="${HOMErrfs}/config/config.yaml"
+source "${HOMErrfs}/workflow/ush/configure_rrfs.sh" "${RRFS_CONFIG_FILE}" "rrfs"|| exit 1
 module list
 set -x
 
@@ -31,28 +35,38 @@ cd "${HOMErrfs}/sorc/WPS" || exit 1
 ./clean
 if [[ "${MACHINE}" == "wcoss2" ]]; then
   cp ../_workaround_/WPS/configure.wps_wcoss2 configure.wps
-elif [[ "${MACHINE}" == "gaeac6" ]] || [[ "${MACHINE}" == "orion" || "${MACHINE}" == "hercules" || "${MACHINE}" == "ursa" ]]; then
-  mkdir -p .tmpNETCDFDIR/include
-  mkdir -p .tmpNETCDFDIR/lib
-  ln -snf "${netcdf_c_ROOT}"/include/* .tmpNETCDFDIR/include
-  ln -snf "${netcdf_c_ROOT}"/lib/* .tmpNETCDFDIR/lib
-  ln -snf "${netcdf_fortran_ROOT}"/include/* .tmpNETCDFDIR/include
-  ln -snf "${netcdf_fortran_ROOT}"/lib/* .tmpNETCDFDIR/lib
-  export NETCDF=${HOMErrfs}/sorc/WPS/.tmpNETCDFDIR
-  module load jasper/2.0.32
-  echo "19" | ./configure --nowrf
 else
-  echo "19" | ./configure --nowrf
+  # Get hardware architecture
+  os=$(uname -m)
+
+  # Apply patches
+  patch_path="${HOMErrfs}/sorc/_workaround_/WPS/patches"
+  patch -N -p1 < ${patch_path}/arch.Config.pl.patch
+  patch -N -p1 < ${patch_path}/preamble.patch
+  patch -N -p1 < ${patch_path}/configure.patch
+  if [[ ${os} = "aarch64" ]]; then
+    patch -N -p1 < ${patch_path}/for_aarch64.patch
+  fi
+  # Jasper lib may be in lib or lib64 depending on the system
+  export JASPERLIB=$(dirname $(find -L ${jasper_ROOT} -name libjasper.so))
+  export JASPERINC=${jasper_ROOT}/include
+  export NETCDF=${netcdf_c_ROOT}
+  export NETCDFF=${netcdf_fortran_ROOT}
+  compiler=$(basename "${CC}")
+  if [[ "${compiler}" == "gcc" ]]; then
+    build_option=3
+  elif [[ "${compiler}" == "icc" ]]; then
+    build_option=23
+  elif [[ "${compiler}" == "icx" ]]; then
+    build_option=19
+  else
+    echo "Error: Unsupported compiler ${compiler}"
+    exit 1
+  fi
+  echo "compiler is ${compiler}, using build option ${build_option}"
+  echo "${build_option}" | ./configure --nowrf
 fi
 ./compile ungrib
-
-if [[ "${MACHINE}" == "gaeac6" ]] || [[ "${MACHINE}" == "orion" || "${MACHINE}" == "hercules" || "${MACHINE}" == "ursa" ]]; then
-  cd ungrib/src || exit 1
-  ifort -o ungrib.exe  misc_definitions_module.o debug_cio.o module_debug.o module_stringutil.o \
-    table.o module_datarray.o gridinfo.o new_storage.o filelist.o ungrib.o output.o rrpr.o \
-    rd_grib1.o file_delete.o datint.o rd_grib2.o ./ngl/w3/libw3.a ./ngl/g2/libg2_4.a \
-    -L"${jasper_ROOT}/lib64" -ljasper -L"${libpng_ROOT}/lib64" -lpng -lz libpgu.a
-fi
 
 mkdir -p "${HOMErrfs}/exec"
 echo "copy ${EXEC} to ../exec/ungrib.x"

@@ -7,9 +7,19 @@ HOMErrfs="$(dirname "$rundir")"
 source "${HOMErrfs}"/workflow/tools/detect_machine.sh
 source "${HOMErrfs}"/workflow/tools/init.sh
 
+set +x
+RRFS_CONFIG_FILE="${HOMErrfs}/config/config.yaml"
+source "${HOMErrfs}/workflow/ush/configure_rrfs.sh" "${RRFS_CONFIG_FILE}" "utils"|| exit 1
+module list
+set -x
+
+
 cd "${HOMErrfs}/sorc/RRFS_UTILS" || exit
-rm -rf build/
-./build.sh
+rm -rf build/ && mkdir -p build
+cd build || exit 1
+cmake .. -DCMAKE_INSTALL_PREFIX=.
+make VERBOSE=1 -j 1 
+make install
 
 mkdir -p "${HOMErrfs}/exec"
 EXEC="${HOMErrfs}/sorc/RRFS_UTILS/build/bin/gen_ensmean_recenter.exe"

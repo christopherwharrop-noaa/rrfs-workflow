@@ -11,12 +11,20 @@ source "${HOMErrfs}/workflow/tools/init.sh"
 
 EXEC="${HOMErrfs}/sorc/rank_run/build/rank_run.x"
 
-set +x
-module purge
-module use "${HOMErrfs}/modulefiles"
-module load "rrfs/${MACHINE}.${COMPILER}"
-module list
-set -x
+if [[ "${MACHINE}" == "wcoss2" ]]; then
+    set +x
+    module purge
+    module use "${HOMErrfs}/modulefiles"
+    module load "rrfs/${MACHINE}.${COMPILER}"
+    module list
+    set -x
+else
+    set +x
+    RRFS_CONFIG_FILE="${HOMErrfs}/config/config.yaml"
+    source "${HOMErrfs}/workflow/ush/configure_rrfs.sh" "${RRFS_CONFIG_FILE}" "rrfs" || exit 1
+    module list
+    set -x
+fi
 
 echo "compiling rank_run ..."
 cd "${HOMErrfs}/sorc/rank_run" || exit 1
