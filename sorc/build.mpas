@@ -4,9 +4,17 @@ set -x
 date
 rundir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 HOMErrfs="$(dirname "$rundir")"
-COMPILER=${COMPILER:-intel}
 
-source "${HOMErrfs}/workflow/tools/detect_machine.sh"
+# Get environment config path
+rrfs_config_file="${1:-${HOMErrfs}/config/config.yaml}"
+
+# Set up the environment
+set +x
+source "${HOMErrfs}/workflow/tools/configure_rrfs.sh" "${rrfs_config_file}" "rrfs" || exit 1
+module list
+set -x
+
+# Set up RRFS FIX file path
 source "${HOMErrfs}/workflow/tools/init.sh"
 
 EXEC="${HOMErrfs}/sorc/MPAS-Model/init_atmosphere_model"
@@ -23,12 +31,6 @@ if [[ "${MACHINE}" == "wcoss2" ]]; then
   module load "rrfs/${MACHINE}.${COMPILER}"
   module list
 fi
-
-set +x
-RRFS_CONFIG_FILE="${HOMErrfs}/config/config.yaml"
-source "${HOMErrfs}/workflow/ush/configure_rrfs.sh" "${RRFS_CONFIG_FILE}" "rrfs" || exit 1
-module list
-set -x
 
 compiler_str="${mpas_build_target:-intel-mpi}"
 echo "compiling MPAS-Model with target: ${compiler_str}"

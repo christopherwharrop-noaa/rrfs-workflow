@@ -5,7 +5,16 @@ date
 rundir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 HOMErrfs="$(dirname "$rundir")"
 
-source "${HOMErrfs}/workflow/tools/detect_machine.sh"
+# Get environment config path
+rrfs_config_file="${1:-${HOMErrfs}/config/config.yaml}"
+
+# Set up the environment
+set +x
+source "${HOMErrfs}/workflow/tools/configure_rrfs.sh" "${rrfs_config_file}" "upp" || exit 1
+module list
+set -x
+
+# Set up RRFS FIX file path
 source "${HOMErrfs}/workflow/tools/init.sh"
 
 EXEC="${HOMErrfs}/sorc/UPP/exec/upp.x"
@@ -18,12 +27,6 @@ if [[ "${MACHINE}" == "wcoss2" ]]; then
     cd "${HOMErrfs}/sorc/UPP/tests" || exit 1
     ./compile_upp.sh
 else
-    set +x
-    RRFS_CONFIG_FILE="${HOMErrfs}/config/config.yaml"
-    source "${HOMErrfs}/workflow/ush/configure_rrfs.sh" "${RRFS_CONFIG_FILE}" "upp" || exit 1
-    module list
-    set -x
-
     cmake_opts=""
     cmake_opts="${cmake_opts} -DCMAKE_INSTALL_PREFIX=../install"
     cmake_opts="${cmake_opts} -DBUILD_WITH_NEMSIO=ON"
@@ -36,14 +39,14 @@ else
     cd "${HOMErrfs}/sorc/UPP/tests" || exit 1
     rm -rf build install
     mkdir -p build && cd build
-    cmake $cmake_opts ${HOMErrfs}/sorc/UPP
+    cmake $cmake_opts ../..
     make -j6 # VERBOSE=1
     make install
-    rm -rf ${HOMErrfs}/sorc/UPP/exec
-    test -d ${HOMErrfs}/sorc/UPP/exec || mkdir -p ${HOMErrfs}/sorc/UPP/exec
-    cp ../install/bin/upp.x ${HOMErrfs}/sorc/UPP/exec/upp.x
+    rm -rf ../../exec
+    test -d ../../exec || mkdir -p ../../exec
+    cp ../install/bin/upp.x ../../exec/.
     if [[ -x ../install/bin/fip2-lookalike.x ]] ; then
-        cp ../install/bin/fip2-lookalike.x ${HOMErrfs}/sorc/UPP/exec/.
+        cp ../install/bin/fip2-lookalike.x ../../exec/.
     fi
 fi
 

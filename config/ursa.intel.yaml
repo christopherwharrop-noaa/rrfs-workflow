@@ -14,6 +14,7 @@ rrfs:
   - "export CMAKE_Fortran_COMPILER=mpiifort"
   - "export PNETCDF=$parallel_netcdf_ROOT"
   - "mpas_build_target=intel-mpi-llvm"
+  - "FIX_RRFS_LOCATION=/scratch4/BMC/rtrr/FIX_RRFS2"
 mpassit:
   - 'module help > /dev/null 2>&1 || source $(bash -l -c "echo $MODULESHOME")/init/profile'
   - "module purge"

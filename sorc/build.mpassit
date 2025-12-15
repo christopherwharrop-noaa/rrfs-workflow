@@ -5,8 +5,16 @@ date
 rundir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 HOMErrfs="$(dirname "$rundir")"
 
-module purge
-source "${HOMErrfs}/workflow/tools/detect_machine.sh"
+# Get environment config path
+rrfs_config_file="${1:-${HOMErrfs}/config/config.yaml}"
+
+# Set up the environment
+set +x
+source "${HOMErrfs}/workflow/tools/configure_rrfs.sh" "${rrfs_config_file}" "mpassit" || exit 1
+module list
+set -x
+
+# Set up RRFS FIX file path
 source "${HOMErrfs}/workflow/tools/init.sh"
 
 EXEC="${HOMErrfs}/sorc/MPASSIT/bin/mpassit"
@@ -18,11 +26,6 @@ if [[ "${MACHINE}" == "wcoss2" ]]; then
     cd "${HOMErrfs}/sorc/MPASSIT" || exit 1
     ./build.sh
 else
-    set +x
-    RRFS_CONFIG_FILE="${HOMErrfs}/config/config.yaml"
-    source "${HOMErrfs}/workflow/ush/configure_rrfs.sh" "${RRFS_CONFIG_FILE}" "mpassit" || exit 1
-    module list
-    set -x
     cd "${HOMErrfs}/sorc/MPASSIT" || exit 1
     CMAKE_FLAGS="-DCMAKE_INSTALL_PREFIX=../ -DEMC_EXEC_DIR=ON -DBUILD_TESTING=OFF"
     debug=true
