@@ -26,12 +26,12 @@ fi
 # link fix files from physics, meshes, graphinfo, stream list, and jedi
 #
 ln -snf "${FIXrrfs}/physics/${PHYSICS_SUITE}"/*  .
-ln -snf "${FIXrrfs}/meshes/${MESH_NAME}.ugwp_oro_data.nc"  ./ugwp_oro_data.nc
+ln -snf "${FIXrrfs}/${MESH_NAME}/${MESH_NAME}.ugwp_oro_data.nc"  ./ugwp_oro_data.nc
 zeta_levels=${EXPDIR}/config/ZETA_LEVELS.txt
 nlevel=$(wc -l < "${zeta_levels}")
-ln -snf "${FIXrrfs}/meshes/${MESH_NAME}.invariant.nc_L${nlevel}_${prefix}"  ./invariant.nc
+ln -snf "${FIXrrfs}/${MESH_NAME}/${MESH_NAME}.invariant.nc_L${nlevel}_${prefix}"  ./invariant.nc
 mkdir -p graphinfo stream_list
-ln -snf "${FIXrrfs}"/graphinfo/*  graphinfo/
+ln -snf "${FIXrrfs}/${MESH_NAME}"/graphinfo/*  graphinfo/
 ${cpreq} "${FIXrrfs}/stream_list/${PHYSICS_SUITE}"/*  stream_list/
 ${cpreq} "${FIXrrfs}"/jedi/obsop_name_map.yaml .
 ${cpreq} "${FIXrrfs}"/jedi/keptvars.yaml .
@@ -48,7 +48,7 @@ mkdir -p obs ens satbias_in satbias_out
 #
 #  bump files and static BEC files
 #
-ln -snf "${FIXrrfs}/bumploc/${MESH_NAME}_L${nlevel}_${NTASKS}_401km11levels"  bumploc
+ln -snf "${FIXrrfs}/${MESH_NAME}/bumploc/${MESH_NAME}_L${nlevel}_${NTASKS}_401km11levels"  bumploc
 
 if [[ ${STATIC_BEC_MODEL} == "GSIBEC" ]]; then
   # gsibec
@@ -57,16 +57,16 @@ if [[ ${STATIC_BEC_MODEL} == "GSIBEC" ]]; then
   ${cpreq} "${FIXrrfs}/gsi_bec/gsiparm_regional.anl" "${DATA}"/gsiparm_regional.anl
   nlevelm1=$((nlevel - 1))
   sed -i -e "s/@GSIBEC_NLAT@/${GSIBEC_NLAT}/" -e "s/@GSIBEC_NLON@/${GSIBEC_NLON}/" -e "s/@GSIBEC_NSIG@/${nlevelm1}/" \
-	 -e "s/@GSIBEC_LAT_START@/${GSIBEC_LAT_START}/" -e "s/@GSIBEC_LAT_END@/${GSIBEC_LAT_END}/" \
-	 -e "s/@GSIBEC_LON_START@/${GSIBEC_LON_START}/" -e "s/@GSIBEC_LON_END@/${GSIBEC_LON_END}/" \
-	 -e "s/@GSIBEC_NORTH_POLE_LAT@/${GSIBEC_NORTH_POLE_LAT}/"  -e "s/@GSIBEC_NORTH_POLE_LON@/${GSIBEC_NORTH_POLE_LON}/"  \
+         -e "s/@GSIBEC_LAT_START@/${GSIBEC_LAT_START}/" -e "s/@GSIBEC_LAT_END@/${GSIBEC_LAT_END}/" \
+         -e "s/@GSIBEC_LON_START@/${GSIBEC_LON_START}/" -e "s/@GSIBEC_LON_END@/${GSIBEC_LON_END}/" \
+         -e "s/@GSIBEC_NORTH_POLE_LAT@/${GSIBEC_NORTH_POLE_LAT}/"  -e "s/@GSIBEC_NORTH_POLE_LON@/${GSIBEC_NORTH_POLE_LON}/"  \
          -e "s/@GSIBEC_NSIGP1@/${nlevel}/"       "${DATA}"/gsiparm_regional.anl
 else
   # bump bec
   mkdir -p static_bec
-  ln -snf "${FIXrrfs}/static_bec/${MESH_NAME}_L${nlevel}/stddev.nc"  static_bec/stddev.nc
-  ln -snf "${FIXrrfs}/static_bec/${MESH_NAME}_L${nlevel}/nicas_${NTASKS}"  static_bec/nicas
-  ln -snf "${FIXrrfs}/static_bec/${MESH_NAME}_L${nlevel}/vbal_${NTASKS}"  static_bec/vbal
+  ln -snf "${FIXrrfs}/${MESH_NAME}/static_bec/${MESH_NAME}_L${nlevel}/stddev.nc"  static_bec/stddev.nc
+  ln -snf "${FIXrrfs}/${MESH_NAME}/static_bec/${MESH_NAME}_L${nlevel}/nicas_${NTASKS}"  static_bec/nicas
+  ln -snf "${FIXrrfs}/${MESH_NAME}/static_bec/${MESH_NAME}_L${nlevel}/vbal_${NTASKS}"  static_bec/vbal
   ${cpreq}  "${EXPDIR}/config/bec_bump.yaml" "${DATA}"/bec_bump.yaml
 fi
 
@@ -88,6 +88,10 @@ source "${USHrrfs}/find_ensembles.sh"
 #
 cd "${DATA}" || exit 1
 ln -snf "${UMBRELLA_PREP_IC_DATA}/${initial_file}" .
+if [[ ${start_type} == "warm" ]] && [[ ${SNUDGETYPES} != "" ]]; then
+    var_list="qv,surface_pressure,theta,tslb,smois,snowh,soilt1,skintemp"
+    ncks -C -v ${var_list} ${initial_file} soilbg.nc
+fi
 #
 # generate namelist, streams, and jedivar.yaml on the fly
 run_duration=1:00:00
@@ -132,7 +136,7 @@ case ${YAML_GEN_METHOD:-1} in
     ;;
 esac
 
-if [[ ${start_type} == "warm" ]] || [[ ${start_type} == "cold" && ${COLDSTART_CYCS_DO_DA} == "true" ]]; then
+if [[ ${start_type} == "warm" ]] || [[ ${start_type} == "cold" && ${COLDSTART_CYCS_DO_DA^^} == "TRUE" ]]; then
   # run mpasjedi_variational.x
   #export OOPS_TRACE=1
   #export OOPS_DEBUG=1
@@ -144,6 +148,18 @@ if [[ ${start_type} == "warm" ]] || [[ ${start_type} == "cold" && ${COLDSTART_CY
   # check the status
   export err=$?
   err_chk
+  if [[ ${start_type} == "warm" ]] && [[ ${SNUDGETYPES} != "" ]]; then
+      # pyioda libraries
+      PYIODALIB=$(echo "$HOMErdasapp"/build/lib/python3.*)
+      export PYTHONPATH="${PYIODALIB}:${PYTHONPATH}"
+      "${USHrrfs}"/snudge.py "${CDATE}" "${SNUDGETYPES}" "${DATA}/${initial_file}"
+      if [[ ! -s "soil_analyzed.nc" ]]; then
+        echo "Warning: soil nudging failed"
+      else
+        var_list="tslb,smois,soilt1,skintemp"
+        ncks -A -v ${var_list} soil_analyzed.nc "${UMBRELLA_PREP_IC_DATA}/${initial_file}"
+      fi
+  fi
   # the input/output file are linked from the umbrella directory, so no need to copy
   cp "${DATA}/${initial_file}" "${COMOUT}/jedivar/${WGF}/${initial_file%.nc}.${timestr}.nc"
   cp "${DATA}"/jdiag* "${COMOUT}/jedivar/${WGF}"

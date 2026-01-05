@@ -28,7 +28,7 @@ def mpassit(xmlFile, expdir, do_ensemble=False, do_ensmean_post=False):
         'MPASSIT_REF_LON': os.getenv('MPASSIT_REF_LON', 'MPASSIT_REF_LON_not_defined'),
     }
 
-    if os.getenv('DO_CHEMISTRY', 'false').lower() == "true":
+    if os.getenv('DO_CHEMISTRY', 'FALSE').upper() == "TRUE":
         dcTaskEnv['CHEM_GROUPS'] = os.getenv('CHEM_GROUPS', 'smoke')
 
     if not do_ensemble:
@@ -77,10 +77,10 @@ def mpassit(xmlFile, expdir, do_ensemble=False, do_ensmean_post=False):
         starttime = get_cascade_env(f"STARTTIME_{meta_id}".upper())
         timedep = f'\n    <timedep><cyclestr offset="{starttime}">@Y@m@d@H@M00</cyclestr></timedep>'
     #
-    if not do_ensmean_post:
-        taskdep = f'\n   <taskdep task="save_fcst{ensindexstr}"/>'
-    else:
+    if do_ensmean_post:
         taskdep = f'\n   <metataskdep metatask="ensmean"/>'
+    else:
+        taskdep = f'\n   <taskdep task="fcst{ensindexstr}"/>'
 
     dependencies = f'''
   <dependency>

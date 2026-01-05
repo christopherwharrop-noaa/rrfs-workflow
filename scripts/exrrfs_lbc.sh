@@ -10,7 +10,7 @@ cd "${DATA}" || exit 1
 #
 fhr_chunk=$(( (10#${LENGTH}/10#${INTERVAL} + 1) / 10#${GROUP_TOTAL_NUM}*10#${INTERVAL} ))
 fhr_begin=$((10#${OFFSET} + (10#${GROUP_INDEX} - 1 )*10#${fhr_chunk} ))
-if (( GROUP_INDEX == GROUP_TOTAL_NUM )); then
+if (( 10#${GROUP_INDEX} == 10#${GROUP_TOTAL_NUM} )); then
   fhr_end=$(( 10#${OFFSET} + 10#${LENGTH}))
 else
   fhr_end=$((10#${OFFSET} + (10#${GROUP_INDEX})*10#${fhr_chunk} - 10#${INTERVAL} ))
@@ -56,7 +56,7 @@ file_content=$(< "${PARMrrfs}/${physics_suite}/namelist.init_atmosphere") # read
 eval "echo \"${file_content}\"" > namelist.init_atmosphere
 
 # update namelist.init_atmosphere if do_chemistry
-if ${DO_CHEMISTRY:-false}; then
+if [[ "${DO_CHEMISTRY^^}" == "TRUE" ]]; then
   source "${USHrrfs}"/chem_namelist_init.sh
 fi
 #
@@ -76,9 +76,9 @@ for fhr in  ${fhr_all}; do
 done
 zeta_levels=${EXPDIR}/config/ZETA_LEVELS.txt
 nlevel=$(wc -l < "${zeta_levels}")
-ln -snf "${FIXrrfs}/meshes/${MESH_NAME}.invariant.nc_L${nlevel}_${prefix}" ./invariant.nc
-${cpreq} "${FIXrrfs}/meshes/${MESH_NAME}.static.nc" static.nc
-${cpreq} "${FIXrrfs}/graphinfo/${MESH_NAME}.graph.info.part.${NTASKS}" .
+ln -snf "${FIXrrfs}/${MESH_NAME}/${MESH_NAME}.invariant.nc_L${nlevel}_${prefix}" ./invariant.nc
+${cpreq} "${FIXrrfs}/${MESH_NAME}/${MESH_NAME}.static.nc" static.nc
+${cpreq} "${FIXrrfs}/${MESH_NAME}/graphinfo/${MESH_NAME}.graph.info.part.${NTASKS}" .
 ln -snf "${FIXrrfs}/physics/${PHYSICS_SUITE}/QNWFA_QNIFA_SIGMA_MONTHLY.dat" .
 
 # run init_atmosphere_model
@@ -91,10 +91,10 @@ if ! ls ./lbc*.nc; then
   err_exit
 fi
 
-# add/update chemistry species to lbc.nc
-if ${DO_CHEMISTRY:-false}; then
-  source "${USHrrfs}"/chem_lbc_update.sh
-fi
+# INFO: chem_lbc_update is unnecessary for smoke/dust w/ RAP/RRFS, but may be necessary for future mixed-model cases
+#if [[ "${DO_CHEMISTRY^^}" == "TRUE" ]]; then
+#  source "${USHrrfs}"/chem_lbc_update.sh
+#fi
 
 # copy lbc*.nc to COMOUT
 ${cpreq} "${DATA}"/lbc*.nc "${COMOUT}/lbc/${WGF}${MEMDIR}"

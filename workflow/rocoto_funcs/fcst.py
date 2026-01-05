@@ -21,26 +21,31 @@ def fcst(xmlFile, expdir, do_ensemble=False, do_spinup=False):
     fcst_len_hrs_cycles = os.getenv('FCST_LEN_HRS_CYCLES', '03 03')
     lbc_interval = os.getenv('LBC_INTERVAL', '3')
     history_interval = os.getenv('HISTORY_INTERVAL', '1')
-    restart_interval = os.getenv('RESTART_INTERVAL', '9999')
+    restart_interval = os.getenv('RESTART_INTERVAL', 'none')
     physics_suite = os.getenv('PHYSICS_SUITE', 'PHYSICS_SUITE_not_defined')
     dcTaskEnv = {
         'EXTRN_MDL_SOURCE': f'{extrn_mdl_source}',
         'LBC_INTERVAL': f'{lbc_interval}',
         'HISTORY_INTERVAL': f'{history_interval}',
         'RESTART_INTERVAL': f'{restart_interval}',
+        'MPASOUT_INTERVAL': os.getenv('MPASOUT_INTERVAL', '1'),
         'PHYSICS_SUITE': f'{physics_suite}',
         'FCST_LEN_HRS_CYCLES': f'{fcst_len_hrs_cycles}',
         'FCST_DT': os.getenv('FCST_DT', 'FCST_DT_not_defined'),
-        'FCST_SUBSteps': os.getenv('FCST_SUBSTEPS', 'FCST_SUBSTEPS_not_defined'),
+        'FCST_SUBSTEPS': os.getenv('FCST_SUBSTEPS', 'FCST_SUBSTEPS_not_defined'),
         'FCST_RADT': os.getenv('FCST_RADT', 'FCST_RADT_not_defined'),
     }
+    if os.getenv('FCST_CONVECTION_SCHEME', 'FALSE').upper() == 'TRUE':
+        dcTaskEnv['FCST_CONVECTION_SCHEME'] = "TRUE"
+    if os.getenv('MPASOUT_SAVE2COM_HRS', '') != '':
+        dcTaskEnv['MPASOUT_SAVE2COM_HRS'] = os.getenv('MPASOUT_SAVE2COM_HRS')
     if do_spinup:
         dcTaskEnv['DO_SPINUP'] = "TRUE"
 
-    if os.getenv('DO_CHEMISTRY', 'false').lower() == "true":
+    if os.getenv('DO_CHEMISTRY', 'FALSE').upper() == "TRUE":
         dcTaskEnv['EBB_DCYCLE'] = os.getenv('EBB_DCYCLE', 0)
         dcTaskEnv['CHEM_GROUPS'] = os.getenv('CHEM_GROUPS', 'smoke')
-        chemdep = '\n<metataskdep metatask="prep_chem"/>'
+        chemdep = '\n    <metataskdep metatask="prep_chem"/>'
     else:
         chemdep = ""
 
@@ -81,9 +86,9 @@ def fcst(xmlFile, expdir, do_ensemble=False, do_spinup=False):
     recenterdep = ""
     if os.getenv("DO_NONVAR_CLOUD_ANA", "FALSE").upper() == "TRUE":
         if do_spinup:
-            cloudana_dep = f'\n<taskdep task="nonvar_cldana_spinup"/>'
+            cloudana_dep = f'\n    <taskdep task="nonvar_cldana_spinup"/>'
         else:
-            cloudana_dep = f'\n<taskdep task="nonvar_cldana"/>'
+            cloudana_dep = f'\n    <taskdep task="nonvar_cldana{ensindexstr}"/>'
     elif os.getenv("DO_JEDI", "FALSE").upper() == "TRUE":
         if os.getenv("DO_ENSEMBLE", "FALSE").upper() == "TRUE":
             jedidep = f'\n<taskdep task="getkf_solver"/>'
@@ -99,11 +104,13 @@ def fcst(xmlFile, expdir, do_ensemble=False, do_spinup=False):
     prep_ic_dep = f'<taskdep task="prep_ic{ensindexstr}"/>'
     if do_spinup:
         prep_ic_dep = f'<taskdep task="prep_ic_spinup"/>'
+    prep_lbc_dep = f'\n    <taskdep task="prep_lbc{ensindexstr}" cycle_offset="0:00:00"/>'
+    if "global" in os.getenv("MESH_NAME"):
+        prep_lbc_dep = ''
 
     dependencies = f'''
   <dependency>
-  <and>{timedep}
-    <taskdep task="prep_lbc{ensindexstr}" cycle_offset="0:00:00"/>
+  <and>{timedep}{prep_lbc_dep}
     {prep_ic_dep}{jedidep}{chemdep}{cloudana_dep}{recenterdep}
   </and>
   </dependency>'''

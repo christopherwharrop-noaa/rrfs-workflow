@@ -17,24 +17,27 @@ def jedivar(xmlFile, expdir, do_spinup=False):
     else:
         cycledefs = 'prod'
         task_id = 'jedivar'
+    coldhrs = os.getenv('COLDSTART_CYCS', '03 15')
+    coldstart_cyc_do_da = os.getenv('COLDSTART_CYCS_DO_DA', 'TRUE')
     # Task-specific EnVars beyond the task_common_vars
     extrn_mdl_source = os.getenv('IC_EXTRN_MDL_NAME', 'IC_PREFIX_not_defined')
     physics_suite = os.getenv('PHYSICS_SUITE', 'PHYSICS_SUITE_not_defined')
     ens_size = int(os.getenv('ENS_SIZE', '2'))
     ens_bec_look_back_hrs = int(os.getenv('ENS_BEC_LOOK_BACK_HRS', '3'))
+    snudgetype = os.getenv('SNUDGETYPES', '')
     dcTaskEnv = {
         'EXTRN_MDL_SOURCE': f'{extrn_mdl_source}',
         'PHYSICS_SUITE': f'{physics_suite}',
         'REFERENCE_TIME': '@Y-@m-@dT@H:00:00Z',
         'YAML_GEN_METHOD': os.getenv('YAML_GEN_METHOD', '1'),
-        'COLDSTART_CYCS_DO_DA': os.getenv('COLDSTART_CYCS_DO_DA', 'true'),
-        'DO_RADAR_REF': os.getenv('DO_RADAR_REF', 'false'),
+        'COLDSTART_CYCS_DO_DA': os.getenv('COLDSTART_CYCS_DO_DA', 'TRUE').upper(),
+        'DO_RADAR_REF': os.getenv('DO_RADAR_REF', 'FALSE').upper(),
         'HYB_WGT_ENS': os.getenv('HYB_WGT_ENS', '0.85'),
         'HYB_WGT_STATIC': os.getenv('HYB_WGT_STATIC', '0.15'),
         'HYB_ENS_TYPE': os.getenv('HYB_ENS_TYPE', '0'),
         'HYB_ENS_PATH': os.getenv('HYB_ENS_PATH', ''),
         'ENS_BEC_LOOK_BACK_HRS': f'{ens_bec_look_back_hrs}',
-        'USE_CONV_SAT_INFO': os.getenv('USE_CONV_SAT_INFO', 'true'),
+        'USE_CONV_SAT_INFO': os.getenv('USE_CONV_SAT_INFO', 'TRUE').upper(),
         'EMPTY_OBS_SPACE_ACTION': os.getenv('EMPTY_OBS_SPACE_ACTION', 'skip output'),
         'STATIC_BEC_MODEL': os.getenv('STATIC_BEC_MODEL', 'GSIBEC'),
         'GSIBEC_X': os.getenv('GSIBEC_X', 'GSIBEC_X_not_defined'),
@@ -50,11 +53,13 @@ def jedivar(xmlFile, expdir, do_spinup=False):
     }
     if do_spinup:
         dcTaskEnv['DO_SPINUP'] = 'TRUE'
+    if len(snudgetype) >= 3:
+        dcTaskEnv['SNUDGETYPES'] = snudgetype
 
     dcTaskEnv['KEEPDATA'] = get_cascade_env(f"KEEPDATA_{task_id}".upper()).upper()
     # dependencies
     timedep = ""
-    realtime = os.getenv("REALTIME", "false")
+    realtime = os.getenv("REALTIME", "FALSE")
     if realtime.upper() == "TRUE":
         starttime = get_cascade_env(f"STARTTIME_{task_id}".upper())
         timedep = f'\n    <timedep><cyclestr offset="{starttime}">@Y@m@d@H@M00</cyclestr></timedep>'
@@ -109,11 +114,37 @@ def jedivar(xmlFile, expdir, do_spinup=False):
         iodadep = f'<datadep age="00:01:00"><cyclestr>&COMROOT;/&NET;/&rrfs_ver;/&RUN;.@Y@m@d/@H/ioda_bufr/det/ioda_aircar.nc</cyclestr></datadep>'
 
     #
+    coldhrs = coldhrs.split(' ')
+    strneqs = ""
+    streqs = ""
+    if coldstart_cyc_do_da.upper() == "FALSE":
+        spaces = " " * 4
+        strneqs = '<or>'
+        streqs = '<or>'
+        for hr in coldhrs:
+            hr = f"{int(hr):02d}"
+            strneqs += '\n' + spaces + f'  <strneq><left><cyclestr>@H</cyclestr></left><right>{hr}</right></strneq>'
+            streqs += '\n' + spaces + f'  <streq><left><cyclestr>@H</cyclestr></left><right>{hr}</right></streq>'
+        strneqs += '\n' + spaces + '</or>'
+        streqs += '\n' + spaces + '</or>'
+        da_dep = f'''<or>
+    <and>
+    {strneqs}
+    {iodadep}{ens_dep}
+    </and>
+    {streqs}
+    </or>
+        '''
+    else:
+        da_dep = f'''
+        {iodadep}{ens_dep}
+        '''
+    #
     dependencies = f'''
   <dependency>
   <and>{timedep}
     {prep_ic_dep}
-    {iodadep}{ens_dep}
+    {da_dep}
   </and>
   </dependency>'''
     #

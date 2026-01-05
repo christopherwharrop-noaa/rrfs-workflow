@@ -12,12 +12,12 @@ timestr=$(date -d "${CDATE:0:8} ${CDATE:8:2}" +%Y-%m-%d_%H.%M.%S)
 time_min="${subcyc:-00}"
 #
 ln -snf "${FIXrrfs}/physics/${PHYSICS_SUITE}"/* .
-ln -snf "${FIXrrfs}/meshes/${MESH_NAME}.ugwp_oro_data.nc" ./ugwp_oro_data.nc
+ln -snf "${FIXrrfs}/${MESH_NAME}/${MESH_NAME}.ugwp_oro_data.nc" ./ugwp_oro_data.nc
 zeta_levels=${EXPDIR}/config/ZETA_LEVELS.txt
 nlevel=$(wc -l < "${zeta_levels}")
-ln -snf "${FIXrrfs}/meshes/${MESH_NAME}.invariant.nc_L${nlevel}_${prefix}" ./invariant.nc
+ln -snf "${FIXrrfs}/${MESH_NAME}/${MESH_NAME}.invariant.nc_L${nlevel}_${prefix}" ./invariant.nc
 mkdir -p graphinfo stream_list
-ln -snf "${FIXrrfs}"/graphinfo/* graphinfo/
+ln -snf "${FIXrrfs}/${MESH_NAME}"/graphinfo/* graphinfo/
 ${cpreq} "${FIXrrfs}/stream_list/${PHYSICS_SUITE}"/* stream_list/
 ${cpreq} "${FIXrrfs}"/jedi/obsop_name_map.yaml .
 ${cpreq} "${FIXrrfs}"/jedi/keptvars.yaml .
@@ -102,7 +102,7 @@ case ${YAML_GEN_METHOD:-1} in
     ;;
 esac
 
-if [[ ${start_type} == "warm" ]] || [[ ${start_type} == "cold" && ${COLDSTART_CYCS_DO_DA} == "true" ]]; then
+if [[ ${start_type} == "warm" ]] || [[ ${start_type} == "cold" && ${COLDSTART_CYCS_DO_DA^^} == "TRUE" ]]; then
   # run mpasjedi_enkf.x
   #export OOPS_TRACE=1
   export OMP_NUM_THREADS=1
@@ -136,7 +136,7 @@ if [[ ${start_type} == "warm" ]] || [[ ${start_type} == "cold" && ${COLDSTART_CY
   fi
 
   # Save analysis files if requested
-  if [[ "${GETKF_TYPE}" == "post" && "${SAVE_GETKF_ANL}" == "true" ]]; then
+  if [[ "${GETKF_TYPE}" == "post" && "${SAVE_GETKF_ANL^^}" == "TRUE" ]]; then
     for mem in $(seq -w 1 030); do
       cp -rL "${DATA}"/data/ens/mem"${mem}".nc "${COMOUT}"/getkf_"${GETKF_TYPE}"/"${WGF}"/mem"${mem}".nc
     done

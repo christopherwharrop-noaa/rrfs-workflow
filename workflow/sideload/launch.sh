@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tweaks for non-NCO experiments
 # This script will NOT be needed by NCO
-# shellcheck disable=SC1090,SC1091,SC2154
+# shellcheck disable=SC1090,SC1091,SC2154,SC2155
 declare -rx PS4='+ $(basename ${BASH_SOURCE[0]:-${FUNCNAME[0]:-"Unknown"}})[${LINENO}]: '
 set -x
 #
@@ -11,19 +11,21 @@ COMMAND=$1  #get the J-JOB name
 task_id=${COMMAND#*_} # remove the "JRRFS_" part
 export task_id=${task_id,,} #to lower case
 echo "run on ${MACHINE}"
-if [[ ${MACHINE} == "wcoss2" ]]; then
-  source "${HOMErrfs}/versions/run.ver"
-  NTASKS=$( wc -l "$PBS_NODEFILE" | awk '{print $1}' )
-  PPN=$( grep -c "$(head -1 "$PBS_NODEFILE")" "$PBS_NODEFILE" )
-  export NTASKS
-  export PPN
-  export NODES=$(( NTASKS / PPN ))
-  export STRIDE=$((128 / PPN))
-  export MPI_RUN_CMD="mpiexec -n $NTASKS -ppn $PPN --cpu-bind core --depth $STRIDE --label --line-buffer"
-else
+if [[ -n "${SLURM_JOB_ID}" ]]; then # slurm
   export NTASKS=${SLURM_NTASKS}
   export NODES=${SLURM_JOB_NUM_NODES}
   export PPN=${SLURM_TASKS_PER_NODE%%(*} # remove the (x6) part of 20(x6)
+elif [[ -n "${PBS_NODEFILE}" ]]; then # PBS
+  export NTASKS=$(wc -l < "${PBS_NODEFILE}")
+  export NODES=$(sort -u "${PBS_NODEFILE}" | wc -l)
+  export PPN=$(grep -c "$(head -1 "${PBS_NODEFILE}")" "${PBS_NODEFILE}" )
+  if [[ ${MACHINE,,} == "wcoss2" ]]; then # special needs at wcoss2
+    source "${HOMErrfs}/versions/run.ver"
+    export STRIDE=$((128 / PPN))
+    export MPI_RUN_CMD="mpiexec -n $NTASKS -ppn $PPN --cpu-bind core --depth $STRIDE --label --line-buffer"
+  fi
+else
+  echo "Info: Not slurm nor PBS"
 fi
 #
 ulimit -s unlimited
@@ -36,7 +38,7 @@ source /etc/profile
 module use "${HOMErrfs}/modulefiles"
 # load corresponding modules for different tasks
 case ${task_id} in
-  ioda_bufr)
+  ioda_bufr|ioda_airnow)
     module purge
     module use "${HOMErrfs}/sorc/RDASApp/modulefiles"
     module load "RDAS/${MACHINE}.${COMPILER}"
@@ -64,6 +66,7 @@ case ${task_id} in
     module purge
     module use "${HOMErrfs}/sorc/RDASApp/modulefiles"
     module load "RDAS/${MACHINE}.${COMPILER}"
+    module load nco
     export LD_LIBRARY_PATH=${HOMErrfs}/sorc/RDASApp/build/lib64:${LD_LIBRARY_PATH}
     ;;
   ioda_mrms_refl)
@@ -80,11 +83,7 @@ case ${task_id} in
   mpassit)
     module purge
     module use "${HOMErrfs}/sorc/MPASSIT/modulefiles"
-    if [[ ${MACHINE} == "ursa" ]]; then
-      module load "build.${MACHINE}.intel-llvm"
-    else
-      module load "build.${MACHINE}.${COMPILER}"
-    fi
+    module load "build.${MACHINE}.${COMPILER}"
     ;;
   upp)
     module purge
@@ -119,7 +118,7 @@ esac
 if [[ ${MACHINE} == "wcoss2" ]]; then
   module load cray-pals/1.3.2 # for mpiexec command
 fi
-module load "prod_util/${MACHINE}"
+module load prod_util
 module list
 set -x
 # workaround for err_exit, https://github.com/NOAA-EMC/NCEPLIBS-prod_util/pull/73
@@ -142,7 +141,14 @@ case ${task_id} in
         set -x
         ;;
     esac
-    "${HOMErrfs}/workflow/sideload/clean.py"
+    if [[ "${CLEAN_MODE}" == "1"  ]]; then
+      "${HOMErrfs}/workflow/sideload/clean.py"
+    elif [[ "${CLEAN_MODE}" == "2"  ]]; then
+      "${HOMErrfs}/workflow/sideload/purge_stmp.sh"
+    else
+      echo -e "CLEAN_MODE is not 1 nor 2, no cleaning.\nEXIT NORMALLY!"
+      exit 0
+    fi
     ;;
   graphics|misc)
     "${HOMErrfs}/workflow/sideload/${task_id}.sh"

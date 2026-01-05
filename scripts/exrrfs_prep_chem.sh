@@ -76,7 +76,7 @@ MOY_END=$(date -d "${CDATE:0:8} ${CDATE:8:2} + ${my_fcst_length} hours" +%B)  # 
 DOY=$(date -d "${CDATE:0:8} ${CDATE:8:2}" +%j)  # Julian day 
 #
 if [[ "${DOY}" -ne 0 ]]; then
-  DOY_m1=$((DOY-1))
+  DOY_m1=$(( 10#${DOY} - 1 ))
 else
   DOY_m1=0
 fi
@@ -123,5 +123,9 @@ if [[ "${CHEM_GROUP}" == "pollen" ]]; then
 fi # bio/pollen
 
 if [[ "${CHEM_GROUP}" == "dust" ]]; then
-  source "${USHrrfs}"/chem_prep_dust.sh
+  if [[ ! -s "${FIXrrfs}/chemistry/dust/fengsha_dust_inputs.${MESH_NAME}.nc" ]]; then
+     source "${HOMErrfs}/workflow/tools/chem_prep_dust.sh"
+     ${cpreq} "${UMBRELLA_PREP_CHEM_DATA}/dust.init.nc" "${FIXrrfs}/chemistry/dust/fengsha_dust_inputs.${MESH_NAME}.nc" 
+     echo "INFO: The new dust.init.nc fix file: ${UMBRELLA_PREP_CHEM_DATA}/dust.init.nc has been copied to ${FIXrrfs}/chemistry/dust/fengsha_dust_inputs.${MESH_NAME}.nc"
+  fi
 fi # dust

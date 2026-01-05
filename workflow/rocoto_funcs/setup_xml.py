@@ -13,12 +13,13 @@ from rocoto_funcs.prep_ic import prep_ic
 from rocoto_funcs.prep_lbc import prep_lbc
 from rocoto_funcs.jedivar import jedivar
 from rocoto_funcs.fcst import fcst
-from rocoto_funcs.save_fcst import save_fcst
+from rocoto_funcs.save_for_next import save_for_next
 from rocoto_funcs.getkf import getkf
 from rocoto_funcs.recenter import recenter
 from rocoto_funcs.ensmean import ensmean
 from rocoto_funcs.mpassit import mpassit
 from rocoto_funcs.upp import upp
+from rocoto_funcs.ioda_airnow import ioda_airnow
 from rocoto_funcs.ioda_bufr import ioda_bufr
 from rocoto_funcs.ioda_mrms_refl import ioda_mrms_refl
 from rocoto_funcs.nonvar_bufrobs import nonvar_bufrobs
@@ -34,13 +35,13 @@ from rocoto_funcs.misc import misc
 
 def setup_xml(HOMErrfs, expdir):
     if os.path.exists(f"{expdir}/config/satinfo") and os.getenv("USE_THE_LATEST_SATBIAS") is None:
-        env_vars = {'USE_THE_LATEST_SATBIAS': 'true'}
+        env_vars = {'USE_THE_LATEST_SATBIAS': 'TRUE'}
         os.environ.update(env_vars)
     machine = os.getenv('MACHINE').lower()
-    do_deterministic = os.getenv('DO_DETERMINISTIC', 'true').upper()
-    do_ensemble = os.getenv('DO_ENSEMBLE', 'false').upper()
-    do_ensmean_post = os.getenv('DO_ENSMEAN_POST', 'false').upper()
-    do_chemistry = os.getenv('DO_CHEMISTRY', 'false').upper()
+    do_deterministic = os.getenv('DO_DETERMINISTIC', 'TRUE').upper()
+    do_ensemble = os.getenv('DO_ENSEMBLE', 'FALSE').upper()
+    do_ensmean_post = os.getenv('DO_ENSMEAN_POST', 'FALSE').upper()
+    do_chemistry = os.getenv('DO_CHEMISTRY', 'FALSE').upper()
     #
     # create cycledefs smartly
     dcCycledef = smart_cycledefs()
@@ -59,6 +60,8 @@ def setup_xml(HOMErrfs, expdir):
 # assemble tasks for a deterministic experiment
         if do_deterministic == "TRUE":
             if os.getenv("DO_IODA", "FALSE").upper() == "TRUE":
+                if do_chemistry == "TRUE":
+                    ioda_airnow(xmlFile, expdir)
                 ioda_bufr(xmlFile, expdir)
             if os.getenv("DO_RADAR_REF", "FALSE").upper() == "TRUE":
                 ioda_mrms_refl(xmlFile, expdir)
@@ -68,9 +71,11 @@ def setup_xml(HOMErrfs, expdir):
             #
             if os.getenv("DO_IC_LBC", "TRUE").upper() == "TRUE":
                 ungrib_ic(xmlFile, expdir)
-                ungrib_lbc(xmlFile, expdir)
+                if "global" not in os.getenv("MESH_NAME"):
+                    ungrib_lbc(xmlFile, expdir)
                 ic(xmlFile, expdir)
-                lbc(xmlFile, expdir)
+                if "global" not in os.getenv("MESH_NAME"):
+                    lbc(xmlFile, expdir)
             #
             if os.getenv("DO_SPINUP", "FALSE").upper() == "TRUE":
                 prep_lbc(xmlFile, expdir)
@@ -86,10 +91,11 @@ def setup_xml(HOMErrfs, expdir):
                 if os.getenv("DO_NONVAR_CLOUD_ANA", "FALSE").upper() == "TRUE":
                     nonvar_cldana(xmlFile, expdir)
                 fcst(xmlFile, expdir)
-                save_fcst(xmlFile, expdir)
+                save_for_next(xmlFile, expdir)
             elif os.getenv("DO_FCST", "TRUE").upper() == "TRUE":
                 prep_ic(xmlFile, expdir)
-                prep_lbc(xmlFile, expdir)
+                if "global" not in os.getenv("MESH_NAME"):
+                    prep_lbc(xmlFile, expdir)
                 if do_chemistry == "TRUE":
                     prep_chem(xmlFile, expdir)
                 if os.getenv("DO_JEDI", "FALSE").upper() == "TRUE":
@@ -97,7 +103,8 @@ def setup_xml(HOMErrfs, expdir):
                 if os.getenv("DO_NONVAR_CLOUD_ANA", "FALSE").upper() == "TRUE":
                     nonvar_cldana(xmlFile, expdir)
                 fcst(xmlFile, expdir)
-                save_fcst(xmlFile, expdir)
+                if os.getenv('DO_CYC', 'FALSE').upper() == "TRUE":
+                    save_for_next(xmlFile, expdir)
             #
             if os.getenv("DO_POST", "TRUE").upper() == "TRUE":
                 mpassit(xmlFile, expdir)
@@ -110,23 +117,34 @@ def setup_xml(HOMErrfs, expdir):
             ic(xmlFile, expdir, do_ensemble=True)
         elif do_ensemble == "TRUE":
             if os.getenv("DO_IODA", "FALSE").upper() == "TRUE":
+                if do_chemistry == "TRUE":
+                    ioda_airnow(xmlFile, expdir)
                 ioda_bufr(xmlFile, expdir)
             if os.getenv("DO_RADAR_REF", "FALSE").upper() == "TRUE":
                 ioda_mrms_refl(xmlFile, expdir)
+            if os.getenv("DO_NONVAR_CLOUD_ANA", "FALSE").upper() == "TRUE":
+                nonvar_bufrobs(xmlFile, expdir)
+                nonvar_reflobs(xmlFile, expdir)
             ungrib_ic(xmlFile, expdir, do_ensemble=True)
-            ungrib_lbc(xmlFile, expdir, do_ensemble=True)
+            if "global" not in os.getenv("MESH_NAME"):
+                ungrib_lbc(xmlFile, expdir, do_ensemble=True)
             ic(xmlFile, expdir, do_ensemble=True)
-            lbc(xmlFile, expdir, do_ensemble=True)
+            if "global" not in os.getenv("MESH_NAME"):
+                lbc(xmlFile, expdir, do_ensemble=True)
             prep_ic(xmlFile, expdir, do_ensemble=True)
-            prep_lbc(xmlFile, expdir, do_ensemble=True)
+            if "global" not in os.getenv("MESH_NAME"):
+                prep_lbc(xmlFile, expdir, do_ensemble=True)
             if os.getenv("DO_RECENTER", "FALSE").upper() == "TRUE":
                 recenter(xmlFile, expdir)
             if os.getenv("DO_JEDI", "FALSE").upper() == "TRUE":
                 getkf(xmlFile, expdir, 'OBSERVER')
                 getkf(xmlFile, expdir, 'SOLVER')
                 getkf(xmlFile, expdir, 'POST')
+            if os.getenv("DO_NONVAR_CLOUD_ANA", "FALSE").upper() == "TRUE":
+                nonvar_cldana(xmlFile, expdir, do_ensemble=True)
             fcst(xmlFile, expdir, do_ensemble=True)
-            save_fcst(xmlFile, expdir, do_ensemble=True)
+            if os.getenv('DO_CYC', 'FALSE').upper() == "TRUE":
+                save_for_next(xmlFile, expdir, do_ensemble=True)
             mpassit(xmlFile, expdir, do_ensemble=True)
             upp(xmlFile, expdir, do_ensemble=True)
             if do_ensmean_post == "TRUE":
