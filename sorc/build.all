@@ -22,7 +22,7 @@ trap cleanup SIGINT SIGTERM
 # Set default options
 da="on"
 chem="off"
-rrfs_config_file="${HOMErrfs}/config/config.yaml"
+rrfs_config_file=""
 
 # Parse command line arguments
 if [ "$#" -gt 3 ]; then
@@ -38,7 +38,9 @@ for arg in "$@"; do
     # handle noda option
     da="off"
   else
-    rrfs_config_file="$arg"
+    # Handle config relative or absolute path
+    config_path="$( cd "$( dirname "${arg}" )" &> /dev/null && pwd )"
+    rrfs_config_file=${config_path}/$(basename "$arg")
   fi
 done
 
@@ -59,7 +61,7 @@ cd "${HOMErrfs}/sorc" || exit 1
 
 echo "building all components, it may take more than one hour..."
 ./build.wps ${rrfs_config_file} &> ./log.build.wps  2>&1 &
-./build.mpas ${rrfs_config_file} &> ./log.build.mpas 2>&1 &
+./build.mpas_cmake ${rrfs_config_file} &> ./log.build.mpas 2>&1 &
 ./build.upp ${rrfs_config_file} &> ./log.build.upp  2>&1 &
 ./build.mpassit ${rrfs_config_file} &> ./log.build.mpassit  2>&1 &
 ./build.utils ${rrfs_config_file} &> ./log.build.utils  2>&1 &

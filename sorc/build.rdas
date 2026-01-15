@@ -13,7 +13,7 @@ usage() {
 }
 
 # Get environment config path
-rrfs_config_file="${HOMErrfs}/config/config.yaml"
+rrfs_config_file=""
 
 # Set default options
 use_same_mpas="yes"
@@ -32,15 +32,6 @@ for arg in "$@"; do
     rrfs_config_file="$arg"
   fi
 done
-
-# Set up the environment
-set +x
-source "${HOMErrfs}/workflow/tools/configure_rrfs.sh" "${rrfs_config_file}" "rrfs" || exit 1
-module list
-set -x
-
-# Set up RRFS FIX file path
-source "${HOMErrfs}/workflow/tools/init.sh"
 
 # get a clean copy of the same MPAS-Model as in the workflow
 # if RDASApp has a different version from the workflow
@@ -86,7 +77,32 @@ cp ../_workaround_/RDASApp/saber/GSIParameters.h sorc/saber/src/saber/gsi/utils/
 cp ../_workaround_/RDASApp/saber/Geometry.cc sorc/saber/src/saber/interpolation/Geometry.cc
 
 rm -rf build/
-./build.sh -m MPAS -t NO -w NO -b NO
+if [[ -z "${rrfs_config_file}" ]]; then
+  # Use unportable configuration and build method
+  source "${HOMErrfs}/workflow/tools/detect_machine.sh"
+  source "${HOMErrfs}/workflow/tools/init.sh"
+  ./build.sh -m MPAS -t NO -w NO -b NO
+else
+  # Use portable configuration and build method
+  config_path="$( cd "$( dirname "${rrfs_config_file}" )" &> /dev/null && pwd )"
+  rrfs_config_file="${config_path}/$(basename "${rrfs_config_file}")"
+
+  # Get fix files location from config
+  set +x
+  source "${HOMErrfs}/workflow/tools/configure.sh" "${rrfs_config_file}" "fix" || exit 1
+  module list
+  set -x
+
+  # Set up RRFS FIX file path
+  source "${HOMErrfs}/workflow/tools/portable_init.sh"
+
+  # Copy portable build scripts to RDASApp
+  cp "${HOMErrfs}/sorc/_workaround_/RDASApp/build.sh" "${HOMErrfs}/sorc/RDASApp/build.sh"
+  cp "${HOMErrfs}/sorc/_workaround_/RDASApp/ush/configure.sh" "${HOMErrfs}/sorc/RDASApp/ush/configure.sh"
+  cp "${HOMErrfs}/sorc/_workaround_/RDASApp/ush/readyaml" "${HOMErrfs}/sorc/RDASApp/ush/readyaml"
+  ./build.sh -m MPAS -t NO -w NO -b NO -y "${rrfs_config_file}"
+fi
+
 
 mkdir -p "${HOMErrfs}/exec"
 echo "copy ${EXEC} to ../exec/mpasjedi_variational.x"

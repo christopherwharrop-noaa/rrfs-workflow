@@ -6,39 +6,39 @@ rundir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 HOMErrfs="$(dirname "$rundir")"
 
 # Get environment config path
-rrfs_config_file="${1:-${HOMErrfs}/config/config.yaml}"
+rrfs_config_file="${1:-}"
 
-# Set up the environment
-set +x
-source "${HOMErrfs}/workflow/tools/configure_rrfs.sh" "${rrfs_config_file}" "mpassit" || exit 1
-module list
-set -x
+if [[ -z "${rrfs_config_file}" ]]; then
+    # Use unportable configuration and build method
+    source "${HOMErrfs}/workflow/tools/detect_machine.sh"
+    source "${HOMErrfs}/workflow/tools/init.sh"
+else
+    # Use portable configuration and build method
+    config_path="$( cd "$( dirname "${rrfs_config_file}" )" &> /dev/null && pwd )"
+    rrfs_config_file="${config_path}/$(basename "${rrfs_config_file}")"
 
-# Set up RRFS FIX file path
-source "${HOMErrfs}/workflow/tools/init.sh"
+    # Get fix files location from config
+    set +x
+    source "${HOMErrfs}/workflow/tools/configure.sh" "${rrfs_config_file}" "fix" || exit 1
+    module list
+    set -x
+
+    # Set up RRFS FIX file path
+    source "${HOMErrfs}/workflow/tools/portable_init.sh"
+
+    # Copy portable build scripts to MPASSIT submodule
+    cp "${HOMErrfs}/sorc/_workaround_/MPASSIT/build.sh" "${HOMErrfs}/sorc/MPASSIT/build.sh"
+    cp "${HOMErrfs}/sorc/_workaround_/MPASSIT/configure.sh" "${HOMErrfs}/sorc/MPASSIT/configure.sh"
+    cp "${HOMErrfs}/sorc/_workaround_/MPASSIT/readyaml" "${HOMErrfs}/sorc/MPASSIT/readyaml"
+fi
 
 EXEC="${HOMErrfs}/sorc/MPASSIT/bin/mpassit"
 
 rm -rf "${HOMErrfs}/sorc/MPASSIT/build"
 rm -rf "${HOMErrfs}/sorc/MPASSIT/bin"
 
-if [[ "${MACHINE}" == "wcoss2" ]]; then
-    cd "${HOMErrfs}/sorc/MPASSIT" || exit 1
-    ./build.sh
-else
-    cd "${HOMErrfs}/sorc/MPASSIT" || exit 1
-    CMAKE_FLAGS="-DCMAKE_INSTALL_PREFIX=../ -DEMC_EXEC_DIR=ON -DBUILD_TESTING=OFF"
-    debug=true
-    if [[ "${debug}" == "true" ]]; then
-        CMAKE_FLAGS="${CMAKE_FLAGS} -DCMAKE_BUILD_TYPE=Debug"
-    else
-        CMAKE_FLAGS="${CMAKE_FLAGS} -DCMAKE_BUILD_TYPE=Release"
-    fi
-    mkdir ./build && cd ./build || exit 0
-    cmake .. ${CMAKE_FLAGS}
-    make -j 8 VERBOSE=1
-    make install
-fi
+cd "${HOMErrfs}/sorc/MPASSIT" || exit 1
+./build.sh -y "${rrfs_config_file}"
 
 mkdir -p "${HOMErrfs}/exec"
 echo "copy ${EXEC} to ../exec/mpassit.x"

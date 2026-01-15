@@ -6,26 +6,36 @@ rundir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 HOMErrfs="$(dirname "$rundir")"
 
 # Get environment config path
-rrfs_config_file="${1:-${HOMErrfs}/config/config.yaml}"
-
-# Set up the environment
-set +x
-source "${HOMErrfs}/workflow/tools/configure_rrfs.sh" "${rrfs_config_file}" "rrfs" || exit 1
-module list
-set -x
-
-# Set up RRFS FIX file path
-source "${HOMErrfs}/workflow/tools/init.sh"
+rrfs_config_file="${1:-}"
 
 EXEC="${HOMErrfs}/sorc/rank_run/build/rank_run.x"
 
-if [[ "${MACHINE}" == "wcoss2" ]]; then
+if [[ -z "${rrfs_config_file}" ]]; then
+    # Use unportable configuration and build method
+    COMPILER=${COMPILER:-intel}
+    source "${HOMErrfs}/workflow/tools/detect_machine.sh"
+    source "${HOMErrfs}/workflow/tools/init.sh"
+
     set +x
     module purge
     module use "${HOMErrfs}/modulefiles"
     module load "rrfs/${MACHINE}.${COMPILER}"
     module list
     set -x
+
+else
+    # Use portable configuration and build method
+    config_path="$( cd "$( dirname "${rrfs_config_file}" )" &> /dev/null && pwd )"
+    rrfs_config_file="${config_path}/$(basename "${rrfs_config_file}")"
+
+    # Set up the environment
+    set +x
+    source "${HOMErrfs}/workflow/tools/configure.sh" "${rrfs_config_file}" "rank_run" || exit 1
+    module list
+    set -x
+
+    # Set up RRFS FIX file pathz
+    source "${HOMErrfs}/workflow/tools/portable_init.sh"
 fi
 
 echo "compiling rank_run ..."
