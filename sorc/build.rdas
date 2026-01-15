@@ -100,6 +100,7 @@ else
   cp "${HOMErrfs}/sorc/_workaround_/RDASApp/build.sh" "${HOMErrfs}/sorc/RDASApp/build.sh"
   cp "${HOMErrfs}/sorc/_workaround_/RDASApp/ush/configure.sh" "${HOMErrfs}/sorc/RDASApp/ush/configure.sh"
   cp "${HOMErrfs}/sorc/_workaround_/RDASApp/ush/readyaml" "${HOMErrfs}/sorc/RDASApp/ush/readyaml"
+  cp "${HOMErrfs}/sorc/_workaround_/RDASApp/ush/portable_init.sh" "${HOMErrfs}/sorc/RDASApp/ush/portable_init.sh"
   ./build.sh -m MPAS -t NO -w NO -b NO -y "${rrfs_config_file}"
 fi
 
