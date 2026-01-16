@@ -30,6 +30,10 @@ for arg in "$@"; do
     use_same_mpas="no"
   else
     rrfs_config_file="$arg"
+    if [[ -n "${rrfs_config_file}" ]]; then
+        config_path="$( cd "$( dirname "${rrfs_config_file}" )" &> /dev/null && pwd )"
+        rrfs_config_file="${config_path}/$(basename "${rrfs_config_file}")"
+    fi
   fi
 done
 
@@ -85,8 +89,6 @@ if [[ -z "${rrfs_config_file}" ]]; then
   ./build.sh -m MPAS -t NO -w NO -b NO
 else
   # Use portable configuration and build method
-  config_path="$( cd "$( dirname "${rrfs_config_file}" )" &> /dev/null && pwd )"
-  rrfs_config_file="${config_path}/$(basename "${rrfs_config_file}")"
 
   # Get fix files location from config
   set +x

@@ -7,6 +7,10 @@ HOMErrfs="$(dirname "$rundir")"
 
 # Get environment config path
 rrfs_config_file="${1:-}"
+if [[ -n "${rrfs_config_file}" ]]; then
+    config_path="$( cd "$( dirname "${rrfs_config_file}" )" &> /dev/null && pwd )"
+    rrfs_config_file="${config_path}/$(basename "${rrfs_config_file}")"
+fi
 
 EXEC="${HOMErrfs}/sorc/UPP/exec/upp.x"
 
@@ -24,8 +28,6 @@ if [[ -z "${rrfs_config_file}" ]]; then
     ./compile_upp.sh
 else
     # Use portable configuration and build method
-    config_path="$( cd "$( dirname "${rrfs_config_file}" )" &> /dev/null && pwd )"
-    rrfs_config_file="${config_path}/$(basename "${rrfs_config_file}")"
 
     # Get fix files location from config
     set +x
